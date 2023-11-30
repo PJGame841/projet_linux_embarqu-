@@ -1,0 +1,4 @@
+**/*.o
+rpi4/server
+rpi4/home.html
+rpi4/data.txt

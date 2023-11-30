@@ -347,13 +347,13 @@ void send_data_http(float temp, float press, float hum)
                         "Host: 192.168.1.4:8080\r\n"
                         "User-Agent: curl/7.68.0\r\n"
                         "Accept: */*\r\n"
-                        "Content-Type: application/json\r\n"
+                        "Content-Type: text/plain\r\n"
                         "Content-Length: 64\r\n"
                         "\r\n"
-                        "{\"temperature\": %0.2lf, \"pressure\": %0.2lf, \"humidity\": %0.2lf}\r\n";
+                        "temp=%0.2lf,hum=%0.2lf,pres=%0.2lf\r\n";
 
     char message[1024];
-    sprintf(message, message_fmt, temp, press, hum);
+    sprintf(message, message_fmt, temp, hum, press);
     printf("%s", message);
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)

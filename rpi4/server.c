@@ -15,7 +15,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define PORT 8080
 #define BUFFER_SIZE 104857600
 
 const char *get_file_extension(const char *file_name) {
@@ -139,6 +138,15 @@ void build_http_response(const char *file_name,
     close(file_fd);
 }
 
+void build_sample_http_response(char *response, size_t *response_len) {
+    snprintf(response, BUFFER_SIZE,
+             "HTTP/1.1 200 OK\r\n"
+             "Content-Type: text/plain\r\n"
+             "\r\n"
+             "Salut");
+    *response_len = strlen(response);
+}
+
 void *handle_client(void *arg) {
     int client_fd = *((int *)arg);
     char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
@@ -156,6 +164,8 @@ void *handle_client(void *arg) {
             buffer[matches[1].rm_eo] = '\0';
             const char *url_encoded_file_name = buffer + matches[1].rm_so;
             char *file_name = url_decode(url_encoded_file_name);
+
+            printf("New GET request on %s\n", file_name);
 
             // get file extension
             char file_ext[32];
@@ -177,25 +187,71 @@ void *handle_client(void *arg) {
         // check if request is POST
         regcomp(&regex, "^POST /([^ ]*) HTTP/1", REG_EXTENDED);
         if (regexec(&regex, buffer, 2, matches, 0) == 0) {
-            // extract filename from request and decode URL
+
+            // Check if url is /api/data/
+            char old_buf_char = buffer[matches[1].rm_eo];
             buffer[matches[1].rm_eo] = '\0';
             const char *url_encoded_file_name = buffer + matches[1].rm_so;
             char *file_name = url_decode(url_encoded_file_name);
+            buffer[matches[1].rm_eo] = old_buf_char;
 
-            // get file extension
-            char file_ext[32];
-            strcpy(file_ext, get_file_extension(file_name));
+            printf("New POST request on %s \n", file_name);
+            if (strcmp(file_name, "api/data") != 0) {
+                // get post data
+                char *data = strstr(buffer, "\r\n\r\n") + 4;
+                printf("Received data: %s\n", data);
 
-            // build HTTP response
-            char *response = (char *)malloc(BUFFER_SIZE * 2 * sizeof(char));
-            size_t response_len;
-            build_http_response(file_name, file_ext, response, &response_len);
+                char *temp = (char *) malloc(100 * sizeof(char));
+                strcpy(temp, strstr(data, "temp=") + 5);
+                temp[(int) (strchr(temp, ',') - temp)] = '\0';
+                float tempe = atof(temp);
+                printf("Temperature: %f\n", tempe);
 
-            // send HTTP response to client
-            send(client_fd, response, response_len, 0);
+                char *hum = (char *) malloc(100 * sizeof(char));
+                strcpy(hum, strstr(data, "hum=") + 4);
+                hum[(int) (strchr(hum, ',') - hum)] = '\0';
+                float humidity = atof(hum);
+                printf("Humidity: %f\n", humidity);
 
-            free(response);
-            free(file_name);
+                char *pres = strstr(data, "pres=") + 5;
+                float pressure = atof(pres);
+                printf("Pressure: %f\n", pressure);
+
+                // Save data to file
+                FILE *fd_data = fopen("data.txt", "a");
+                fseek(fd_data, 0, SEEK_SET);
+                fprintf(fd_data, "%f,%f,%f\n", tempe, humidity, pressure);
+                fclose(fd_data);
+
+                // build HTTP response
+                char *response = (char *)malloc(BUFFER_SIZE * 2 * sizeof(char));
+                size_t response_len;
+                build_sample_http_response(response, &response_len);
+
+                // send HTTP response to client
+                send(client_fd, response, response_len, 0);
+
+                free(response);
+                free(file_name);
+
+                free(temp);
+                free(hum);
+            } else {
+                // get file extension
+                char file_ext[32];
+                strcpy(file_ext, get_file_extension(file_name));
+
+                // build HTTP response
+                char *response = (char *)malloc(BUFFER_SIZE * 2 * sizeof(char));
+                size_t response_len;
+                build_http_response(file_name, file_ext, response, &response_len);
+
+                // send HTTP response to client
+                send(client_fd, response, response_len, 0);
+
+                free(response);
+                free(file_name);
+            }
         }
         regfree(&regex);
     }
@@ -206,6 +262,12 @@ void *handle_client(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc <= 1) {
+        printf("Usage: %s <port>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    int PORT = atoi(argv[1]);
+
     int server_fd;
     struct sockaddr_in server_addr;
 
