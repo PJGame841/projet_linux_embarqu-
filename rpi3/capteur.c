@@ -52,6 +52,9 @@ struct identifier
     int8_t fd;
 };
 
+char *HOST_IP = "192.168.1.4";
+int PORT = 8080;
+
 /****************************************************************************/
 /*!                         Functions                                       */
 
@@ -138,18 +141,20 @@ void send_data_http(float temp, float press, float hum);
  */
 int main(int argc, char* argv[])
 {
+    if (argc < 4) {
+        printf("Usage: %s <i2c bus> <host ip> <port>\n", argv[0]);
+        exit(1);
+    }
+
+    HOST_IP = argv[2];
+    PORT = atoi(argv[3]);
+
     struct bme280_dev dev;
 
     struct identifier id;
 
     /* Variable to define the result */
     int8_t rslt = BME280_OK;
-
-    if (argc < 2)
-    {
-        fprintf(stderr, "Missing argument for i2c bus.\n");
-        exit(1);
-    }
 
     if ((id.fd = open(argv[1], O_RDWR)) < 0)
     {
@@ -343,7 +348,7 @@ int8_t stream_sensor_data_forced_mode(struct bme280_dev *dev)
 void send_data_http(float temp, float press, float hum)
 {
     // Send HTTP request
-    char *message_fmt = "POST /api/data HTTP/1.1\r\n"
+    char *message_fmt = "POST /api/data/ HTTP/1.1\r\n"
                         "Host: 192.168.1.4:8080\r\n"
                         "User-Agent: curl/7.68.0\r\n"
                         "Accept: */*\r\n"
@@ -354,7 +359,6 @@ void send_data_http(float temp, float press, float hum)
 
     char message[1024];
     sprintf(message, message_fmt, temp, hum, press);
-    printf("%s", message);
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
     {
