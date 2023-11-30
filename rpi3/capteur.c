@@ -23,6 +23,9 @@
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
 
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
 /******************************************************************************/
 /*!                         System header files                               */
 #include <string.h>
@@ -128,7 +131,7 @@ int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *data, uint32_t len, void 
  */
 int8_t stream_sensor_data_forced_mode(struct bme280_dev *dev);
 
-void send_data_http(struct bme280_data *comp_data);
+void send_data_http(float temp, float press, float hum);
 
 /*!
  * @brief This function starts execution of the program.
@@ -350,7 +353,7 @@ void send_data_http(float temp, float press, float hum)
                         "{\"temperature\": %0.2lf, \"pressure\": %0.2lf, \"humidity\": %0.2lf}\r\n";
 
     char message[1024];
-    sprintf(message, message_fmt);
+    sprintf(message, message_fmt, temp, press, hum);
     printf("%s", message);
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
